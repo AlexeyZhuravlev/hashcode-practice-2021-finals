@@ -130,7 +130,7 @@ struct Context {
         forn(j, Solution.size()) {
             events[0].pb(j);
         }
-        vi working_on_binary(engineers, -1);
+        vector<vi> working_on_binary(engineers, vi(days_limit, -1));
         vector<set<int>> services_in_binary(initial_binaries_num);
         vi service_to_binary(services_num);
         forn(j, services_num) {
@@ -178,24 +178,29 @@ struct Context {
                     int feature = feature_name_to_id[impl->feature];
                     int t = features[feature].difficulty + services_in_binary[impl->binary].size();
                     forn(other, engineers) {
-                        if (other != eng && working_on_binary[other] == impl->binary) {
+                        if (other != eng && working_on_binary[other][day] == impl->binary) {
                             ++t;
                         }
                     }
                     // cerr << "impl t = " << t << endl;
-                    working_on_binary[eng] = impl->binary;
+                    fore(d, day, day + t - 1) {
+                        working_on_binary[eng][d] = impl->binary;
+                    }
                     if (day + t < days_limit) {
                         events[day + t].pb(eng);
                     }
                     continue;
                 }
-                // not working on any binaries 
-                working_on_binary[eng] = -1;
 
                 Move* move = dynamic_cast<Move*>(task);
                 if (move != nullptr) {
                     int service = service_name_to_id[move->service];
                     int cur_binary = service_to_binary[service];
+                    assert(cur_binary != move->new_binary && "move should be to a different binary");
+                    forn(other, engineers) {
+                        assert(working_on_binary[other][day] != cur_binary && "move: source binary is being worked on");
+                        assert(working_on_binary[other][day] != move->new_binary && "move: dest binary is being worked on");
+                    }
 
                     int t = max(services_in_binary[cur_binary].size(), services_in_binary[move->new_binary].size());
 
@@ -204,6 +209,9 @@ struct Context {
                     service_to_binary[service] = move->new_binary;
 
                     // cerr << "move t = " << t << endl;
+                    fore(d, day, day + t - 1) {
+                        working_on_binary[eng][d] = move->new_binary;
+                    }
                     if (day + t < days_limit) {
                         events[day + t].pb(eng);
                     }
@@ -212,7 +220,11 @@ struct Context {
                 }
                 New* nnew = dynamic_cast<New*>(task);
                 if (nnew != nullptr) {
-                    services_in_binary.resize(service_to_binary.size() + 1);
+                    services_in_binary.resize(services_in_binary.size() + 1);
+
+                    fore(d, day, day + new_binary_time - 1) {
+                        working_on_binary[eng][d] = services_in_binary.size() - 1;
+                    }
 
                     if (day + new_binary_time < days_limit) {
                         events[day + new_binary_time].pb(eng);
