@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <random>
 #include <vector>
 #include <iostream>
 #include <cassert>
@@ -18,11 +19,14 @@ using namespace std;
 
 const int kInf = 1000000000;
 
-template<class T>
-queue<T> vec_to_queue(const vector<T>& vec) {
-    queue<T> q;
+using MinQueue = set<pair<int, int>, less<>>;
+
+mt19937 rng(1337);
+
+MinQueue vec_to_queue(const vector<pair<int, int>>& vec) {
+    MinQueue q;
     for (auto elem : vec) {
-        q.push(elem);
+        q.insert(elem);
     }
     return q;
 }
@@ -31,7 +35,9 @@ struct MySolver : public Context {
     set<pair<int, int>> developer_ready_day;
     
     vector<vector<int>> feature_bins;
-    vector<queue<pair<int, int>>> feature_bins_remaining;
+    vector<MinQueue> feature_bins_remaining;
+    
+    map<int, int> val_in_remaining;
     
     vector<int> dev_currently_in;
     
@@ -77,15 +83,24 @@ struct MySolver : public Context {
     static void FreeDevs(int day,
                          const set<pair<int, int>>& dev_ready_day,
                          vector<int>& dev_cur_in,
-                         vector<int>& cur_devs_in_bin) {
+                         vector<int>& cur_devs_in_bin,
+                         MinQueue& remaining,
+                         map<int, int>& val_in_rem) {
         auto cur_day_beg = dev_ready_day.lower_bound({day, -kInf});
         auto cur_day_end = dev_ready_day.upper_bound({day, kInf});
         for (auto it = cur_day_beg; it != cur_day_end; ++it) {
             auto [_, eng_id] = *it;
-            if (dev_cur_in[eng_id] != -1) {
-                --cur_devs_in_bin[dev_cur_in[eng_id]];
+            int bin_id = dev_cur_in[eng_id];
+            if (bin_id != -1) {
+                --cur_devs_in_bin[bin_id];
                 dev_cur_in[eng_id] = -1;
-                // TODO: update some shit in `feature_bins_remaining` here
+                if (!remaining.empty()) {
+                    pair prev_val = {val_in_rem[bin_id], bin_id};
+                    if (auto in_rem = remaining.find(prev_val); in_rem != remaining.end()) {
+                        remaining.emplace(--val_in_rem[bin_id], bin_id);
+                        remaining.erase(in_rem);
+                    }
+                }
             }
         }
     }
@@ -96,30 +111,34 @@ struct MySolver : public Context {
             int cost = features[feature].difficulty + services_in_binary[fb] + cur_devs_in_binary[fb];
             feature_bins_remaining_vec.emplace_back(cost, fb);
         }
-        sort(feature_bins_remaining_vec.begin(), feature_bins_remaining_vec.end(), greater<>());
+//        sort(feature_bins_remaining_vec.begin(), feature_bins_remaining_vec.end(), greater<>());
+        shuffle(feature_bins_remaining_vec.begin(), feature_bins_remaining_vec.end(), rng);
         return feature_bins_remaining_vec;
     }
     
-    int Model(int day, int feature_id, queue<pair<int, int>> remaining) const {
+    int Model(int day, int feature_id, MinQueue remaining) const {
         auto dev_ready_day = developer_ready_day;
         auto dev_cur_in = dev_currently_in;
         auto cur_devs_in_bin = cur_devs_in_binary;
         
+        auto val_in_rem = val_in_remaining;
+        
         int max_end_day = day;
         
         for (; !remaining.empty(); ++day) {
-            FreeDevs(day, dev_ready_day, dev_cur_in, cur_devs_in_bin);
+            FreeDevs(day, dev_ready_day, dev_cur_in, cur_devs_in_bin, remaining, val_in_rem);
             
             while (!remaining.empty() && dev_ready_day.begin()->first <= day) {
                 auto [_1, eng_id] = pair(*dev_ready_day.begin());
                 dev_ready_day.erase(dev_ready_day.begin());
-                auto [_2, bin_id] = pair(remaining.front());
-                remaining.pop();
+                auto [_2, bin_id] = pair(*remaining.begin());
+                remaining.erase(remaining.begin());
                 int end_day = day +
                     features[feature_id].difficulty +
                     services_in_binary[bin_id] +
                     cur_devs_in_bin[bin_id];
                 dev_ready_day.emplace(end_day, eng_id);
+                dev_cur_in[eng_id] = bin_id;
                 ++cur_devs_in_bin[bin_id];
                 max_end_day = max(max_end_day, day);
             }
@@ -134,7 +153,13 @@ struct MySolver : public Context {
         uint64_t full_score = 0;
         
         for (int day = 0; day < days_limit; ++day) {
-            FreeDevs(day, developer_ready_day, dev_currently_in, cur_devs_in_binary);
+            if (incomplete_feature != -1) {
+                FreeDevs(day, developer_ready_day, dev_currently_in, cur_devs_in_binary, feature_bins_remaining[incomplete_feature], val_in_remaining);
+            } else {
+                MinQueue rem;
+                map<int, int> val;
+                FreeDevs(day, developer_ready_day, dev_currently_in, cur_devs_in_binary, rem, val);
+            }
             
             do {
                 if (incomplete_feature != -1) {
@@ -142,14 +167,15 @@ struct MySolver : public Context {
                     while (!remaining.empty() && !developer_ready_day.empty() && developer_ready_day.begin()->first <= day) {
                         auto [_1, eng_id] = pair(*developer_ready_day.begin());
                         developer_ready_day.erase(developer_ready_day.begin());
-                        auto [_2, bin_id] = pair(remaining.front());
-                        remaining.pop();
+                        auto [_2, bin_id] = pair(*remaining.begin());
+                        remaining.erase(remaining.begin());
                         Solution[eng_id].push_back(new Implement(feature_id_to_name[incomplete_feature], bin_id));
                         developer_ready_day.emplace(day + features[incomplete_feature].difficulty +
                                                     services_in_binary[bin_id] +
                                                     cur_devs_in_binary[bin_id],
                                                     eng_id);
                         ++cur_devs_in_binary[bin_id];
+                        dev_currently_in[eng_id] = bin_id;
                     }
                     
                     if (remaining.empty()) {
@@ -162,6 +188,10 @@ struct MySolver : public Context {
                     feature_bonus.reserve(remaining_features.size());
                     for (int feature : remaining_features) {
                         auto feature_bins_remaining_vec = MakeFeatureBinsRemainingSortedVec(feature);
+                        val_in_remaining.clear();
+                        for (auto [a,b] : feature_bins_remaining_vec) {
+                            val_in_remaining[b] = a;
+                        }
                         int days_when_feature_is_ready = Model(day, feature, vec_to_queue(feature_bins_remaining_vec));
                         uint64_t bonus = static_cast<uint64_t>(days_when_feature_is_ready) * features[feature].users;
                         feature_bonus.emplace_back(bonus, feature);
@@ -171,6 +201,10 @@ struct MySolver : public Context {
                     incomplete_feature = feature;
                     remaining_features.erase(feature);
                     feature_bins_remaining[feature] = vec_to_queue(MakeFeatureBinsRemainingSortedVec(feature));
+                    val_in_remaining.clear();
+                    for (auto [a,b] : feature_bins_remaining[feature]) {
+                        val_in_remaining[b] = a;
+                    }
                 }
             } while (incomplete_feature != -1 && developer_ready_day.begin()->first <= day);
         }
