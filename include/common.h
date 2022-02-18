@@ -147,6 +147,7 @@ struct Context {
         }
 
         forn(day, days_limit) {
+            // cerr << remaining_services_for_feature[12].size() << endl;
             for (int eng: events[day]) {
                 // cerr << "day " << day << " eng = " << eng <<  " pointer for him = " << pointer[eng] << endl;
                 if (pointer[eng]) {
@@ -154,15 +155,26 @@ struct Context {
                     Implement* impl = dynamic_cast<Implement*>(Solution[eng][pointer[eng] - 1]);
                     if (impl != nullptr) {
                         int feature = feature_name_to_id[impl->feature];
+                        assert(feature >= 0 && feature < features_num && "incorrect feature id");
+                        // assert(remaining_services_for_feature.size() == features_num);
                         if (!remaining_services_for_feature[feature].empty()) {
+                            assert(impl->binary >= 0 && impl->binary < (int)services_in_binary.size() && "invalid impl binary");
                             for (int service: services_in_binary[impl->binary]) {
-                                remaining_services_for_feature[feature].erase(service);
+                                assert(service >= 0 && service < services_num && "incorrect service id");
+                                // cerr << "before erase" << endl;
+                                // assert(feature < remaining_services_for_feature.size());
+                                // cerr << "feature = " << feature << " " << remaining_services_for_feature[feature].size() << endl;
+                                if (remaining_services_for_feature[feature].count(service)) {
+                                    remaining_services_for_feature[feature].erase(service);
+                                }
+                                // cerr << "done with erase" << endl;
                             }
                             if (remaining_services_for_feature[feature].empty()) {
-                                cerr << "feature " << feature << " done on day " << day << endl;
+                                // cerr << "feature " << feature << " done on day " << day << endl;
                                 score += (li)(days_limit - day) * features[feature].users;
                             }
                         }
+                        // cerr << "done with this block" << endl;
                     }
                 }
                 if (pointer[eng] == (int)Solution[eng].size()) {
@@ -183,7 +195,7 @@ struct Context {
                         }
                     }
                     // cerr << "impl t = " << t << endl;
-                    fore(d, day, day + t - 1) {
+                    fore(d, day, min(days_limit, day + t) - 1) {
                         working_on_binary[eng][d] = impl->binary;
                     }
                     if (day + t < days_limit) {
@@ -209,7 +221,7 @@ struct Context {
                     service_to_binary[service] = move->new_binary;
 
                     // cerr << "move t = " << t << endl;
-                    fore(d, day, day + t - 1) {
+                    fore(d, day, min(days_limit, day + t) - 1) {
                         working_on_binary[eng][d] = move->new_binary;
                     }
                     if (day + t < days_limit) {
@@ -222,7 +234,7 @@ struct Context {
                 if (nnew != nullptr) {
                     services_in_binary.resize(services_in_binary.size() + 1);
 
-                    fore(d, day, day + new_binary_time - 1) {
+                    fore(d, day, min(days_limit, day + new_binary_time) - 1) {
                         working_on_binary[eng][d] = services_in_binary.size() - 1;
                     }
 
