@@ -30,6 +30,23 @@ using namespace std;
 
 struct MySolver : public Context {
     void Solve() {
+        Task* move = new Move("sc", 2);
+        vector<Task*> first;
+        first.pb(move);
+        Task* impl = new Implement("foo", 2);
+        first.pb(impl);
+
+        Solution.pb(first);
+
+        vector<Task*> second;
+        Task* wait = new Wait(2);
+        second.pb(wait);
+        impl = new Implement("bar", 1);
+        second.pb(impl);
+        impl = new Implement("bar", 2);
+        second.pb(impl);
+
+        Solution.pb(second);
         // Solution goes here
     }
 };
