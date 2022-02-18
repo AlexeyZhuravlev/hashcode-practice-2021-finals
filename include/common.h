@@ -33,8 +33,7 @@ struct Service {
 };
 
 struct Feature {
-    string name;
-    int services_num, difficulty, users;
+    int id, services_num, difficulty, users;
     vi services;
 };
 
@@ -53,10 +52,10 @@ struct Implement: public Task {
 
 struct Move: public Task {
     string service;
-    int binary;
-    Move(string service, int binary): service(service), binary(binary) {}
+    int new_binary;
+    Move(string service, int new_binary): service(service), new_binary(new_binary) {}
     void print() override {
-        cout << "move " << service << " " << binary << endl;
+        cout << "move " << service << " " << new_binary << endl;
     }
 };
 
@@ -82,6 +81,7 @@ struct Context {
     vector<Service> services;
     vector<Feature> features;
     map<string, int> service_name_to_id;
+    map<string, int> feature_name_to_id;
 
     void Input() {
         cin >> days_limit >> engineers >> services_num >> initial_binaries_num >> features_num >> new_binary_time;
@@ -94,7 +94,10 @@ struct Context {
         features.resize(features_num);
         forn(i, features_num) {
             Feature& feature = features[i];
-            cin >> feature.name >> feature.services_num >> feature.difficulty >> feature.users;
+            string feature_name;
+            cin >> feature_name >> feature.services_num >> feature.difficulty >> feature.users;
+            feature_name_to_id[feature_name] = feature.id = i;
+
             feature.services.resize(feature.services_num);
             forn(j, feature.services_num) {
                 string service_name;
@@ -115,6 +118,52 @@ struct Context {
     }
 
     uint64_t GetScore() {
+        // vector<vi> events(days_limit);
+        // vi pointer(engineers);
+        // events[0].pb(0);
+        // events[0].pb(1);
+        // set<int> binaries(initial_binaries_num);
+        // vi working_on(engineers, -1);
+
+        // forn(day, days_limit) {
+        //     if (!events[day].empty()) {
+        //         check features, calc score
+        //     }
+            
+        //     for (int eng: events[day]) {
+        //         if (pointer[eng] == (int)Solution[eng].size()) {
+        //             // done all work for engineer
+        //             continue;
+        //         }
+        //         Task* task = Solution[eng][pointer[eng]];
+
+        //         Implement* impl = dynamic_cast<Implement*>(task);
+        //         if (impl != nullptr) {
+        //             int t = features[impl->feature] + binaries[impl->binary].size();
+        //             forn(other, engineers) {
+        //                 if (other != eng && working_on[other] == impl->binary) {
+        //                     ++t;
+        //                 }
+        //             }
+        //             if (day + t < days_limit) {
+        //                 events[day + t].pb(eng);
+        //             }
+        //             continue;
+        //         }
+        //         Move* move = dynamic_cast<Move*>(task);
+        //         if (move != nullptr) {
+        //             cerr << "move" << endl;
+        //         }
+        //         New* nnew = dynamic_cast<New*>(task);
+        //         if (nnew != nullptr) {
+        //             cerr << "new" << endl;
+        //         } 
+        //         Wait* wait = dynamic_cast<Wait*>(task);
+        //         if (wait != nullptr) {
+        //             cerr << "wait" << endl;
+        //         }
+        //     }
+        // }
         return 0;
     }
     
