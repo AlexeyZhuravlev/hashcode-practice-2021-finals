@@ -105,6 +105,8 @@ struct MySolver : public Context {
         auto dev_cur_in = dev_currently_in;
         auto cur_devs_in_bin = cur_devs_in_binary;
         
+        int max_end_day = day;
+        
         for (; !remaining.empty(); ++day) {
             FreeDevs(day, dev_ready_day, dev_cur_in, cur_devs_in_bin);
             
@@ -113,19 +115,23 @@ struct MySolver : public Context {
                 dev_ready_day.erase(dev_ready_day.begin());
                 auto [_2, bin_id] = pair(remaining.front());
                 remaining.pop();
-                dev_ready_day.emplace(day + features[feature_id].difficulty +
-                                      services_in_binary[bin_id] +
-                                      cur_devs_in_bin[bin_id],
-                                      eng_id);
+                int end_day = day +
+                    features[feature_id].difficulty +
+                    services_in_binary[bin_id] +
+                    cur_devs_in_bin[bin_id];
+                dev_ready_day.emplace(end_day, eng_id);
                 ++cur_devs_in_bin[bin_id];
+                max_end_day = max(max_end_day, day);
             }
         }
         
-        return days_limit - day;
+        return max(0, days_limit - max_end_day);
     }
     
     void Solve() {
         Init();
+        
+        uint64_t full_score = 0;
         
         for (int day = 0; day < days_limit; ++day) {
             FreeDevs(day, developer_ready_day, dev_currently_in, cur_devs_in_binary);
@@ -156,17 +162,20 @@ struct MySolver : public Context {
                     feature_bonus.reserve(remaining_features.size());
                     for (int feature : remaining_features) {
                         auto feature_bins_remaining_vec = MakeFeatureBinsRemainingSortedVec(feature);
-                        int time_to_complete = Model(day, feature, vec_to_queue(feature_bins_remaining_vec));
-                        uint64_t bonus = static_cast<uint64_t>(max(0, days_limit - day -  time_to_complete)) * features[feature].users;
+                        int days_when_feature_is_ready = Model(day, feature, vec_to_queue(feature_bins_remaining_vec));
+                        uint64_t bonus = static_cast<uint64_t>(days_when_feature_is_ready) * features[feature].users;
                         feature_bonus.emplace_back(bonus, feature);
                     }
-                    auto [_, feature] = *max_element(feature_bonus.begin(), feature_bonus.end());
+                    auto [bonus, feature] = *max_element(feature_bonus.begin(), feature_bonus.end());
+                    full_score += bonus;
                     incomplete_feature = feature;
                     remaining_features.erase(feature);
                     feature_bins_remaining[feature] = vec_to_queue(MakeFeatureBinsRemainingSortedVec(feature));
                 }
             } while (incomplete_feature != -1 && developer_ready_day.begin()->first <= day);
         }
+        
+        cerr << "Anticipated score:" << full_score << endl;
     }
 };
 
