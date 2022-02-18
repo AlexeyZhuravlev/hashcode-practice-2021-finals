@@ -66,10 +66,10 @@ struct New: public Task {
 };
 
 struct Wait : public Task {
-    int w;
-    Wait(int w): w(w) {}
+    int days;
+    Wait(int days): days(days) {}
     void print() override {
-        cout << "wait " << w << endl;
+        cout << "wait " << days << endl;
     }
 };
 
@@ -123,70 +123,112 @@ struct Context {
     }
 
     uint64_t GetScore() {
-        // vector<vi> events(days_limit);
-        // vi pointer(engineers);
-        // events[0].pb(0);
-        // events[0].pb(1);
-        // set<int> binaries(initial_binaries_num);
-        // vi working_on_binary(engineers, -1);
-        // set<int> services_in_binary(initial_binaries_num);
-        // vi service_to_binary(services_num);
-        // forn(j, services_num) {
-        //     service_to_binary[j] = services[j].binary;
-        // }
+        li score = 0;
 
-        // forn(day, days_limit) {
-        //     if (!events[day].empty()) {
-        //         check features, calc score
-        //     }
+        vector<vi> events(days_limit);
+        vi pointer(engineers);
+        forn(j, Solution.size()) {
+            events[0].pb(j);
+        }
+        vi working_on_binary(engineers, -1);
+        vector<set<int>> services_in_binary(initial_binaries_num);
+        vi service_to_binary(services_num);
+        forn(j, services_num) {
+            service_to_binary[j] = services[j].binary;
 
-        //     for (int eng: events[day]) {
-        //         cerr << "day " << day " eng = " << eng << endl;
-        //         if (pointer[eng] == (int)Solution[eng].size()) {
-        //             // done all work for engineer
-        //             continue;
-        //         }
-        //         Task* task = Solution[eng][pointer[eng]];
+            services_in_binary[services[j].binary].insert(j);
+        }
 
-        //         Implement* impl = dynamic_cast<Implement*>(task);
-        //         if (impl != nullptr) {
-        //             int t = features[impl->feature] + binaries[impl->binary].size();
-        //             forn(other, engineers) {
-        //                 if (other != eng && working_on_binary[other] == impl->binary) {
-        //                     ++t;
-        //                 }
-        //             }
-        //             working_on_binary[eng] = impl->binary;
-        //             if (day + t < days_limit) {
-        //                 events[day + t].pb(eng);
-        //             }
-        //             continue;
-        //         }
-        //         // not working on any binaries 
-        //         working_on_binary[eng] = -1;
+        vector<set<int>> remaining_services_for_feature(features_num);
+        forn(i, features_num) {
+            for (int s: features[i].services) {
+                remaining_services_for_feature[i].insert(s);
+            }
+        }
 
-        //         Move* move = dynamic_cast<Move*>(task);
-        //         if (move != nullptr) {
-        //             int cur_binary = service_to_binary[move->service];
+        forn(day, days_limit) {
+            for (int eng: events[day]) {
+                // cerr << "day " << day << " eng = " << eng <<  " pointer for him = " << pointer[eng] << endl;
+                if (pointer[eng]) {
+                    // check if we were implementing last time
+                    Implement* impl = dynamic_cast<Implement*>(Solution[eng][pointer[eng] - 1]);
+                    if (impl != nullptr) {
+                        int feature = feature_name_to_id[impl->feature];
+                        if (!remaining_services_for_feature[feature].empty()) {
+                            for (int service: services_in_binary[impl->binary]) {
+                                remaining_services_for_feature[feature].erase(service);
+                            }
+                            if (remaining_services_for_feature[feature].empty()) {
+                                cerr << "feature " << feature << " done on day " << day << endl;
+                                score += (li)(days_limit - day) * features[feature].users;
+                            }
+                        }
+                    }
+                }
+                if (pointer[eng] == (int)Solution[eng].size()) {
+                    // cerr << "done work for eng " << eng << endl;
+                    // done all work for engineer
+                    continue;
+                }
+                Task* task = Solution[eng][pointer[eng]];
+                ++pointer[eng];
 
-        //             int t = max(services_in_binary[cur_binary].size(), service_to_binary[move->new_binary].size());
-        //             services_in_binary[cur_binary].erase(move->service);
-        //             services_in_binary[move->new_binary].insert(move->service);
-        //             service_to_binary[move->service] = move->new_binary;
+                Implement* impl = dynamic_cast<Implement*>(task);
+                if (impl != nullptr) {
+                    int feature = feature_name_to_id[impl->feature];
+                    int t = features[feature].difficulty + services_in_binary[impl->binary].size();
+                    forn(other, engineers) {
+                        if (other != eng && working_on_binary[other] == impl->binary) {
+                            ++t;
+                        }
+                    }
+                    // cerr << "impl t = " << t << endl;
+                    working_on_binary[eng] = impl->binary;
+                    if (day + t < days_limit) {
+                        events[day + t].pb(eng);
+                    }
+                    continue;
+                }
+                // not working on any binaries 
+                working_on_binary[eng] = -1;
 
-        //             cerr << "move" << endl;
-        //         }
-        //         New* nnew = dynamic_cast<New*>(task);
-        //         if (nnew != nullptr) {
-        //             cerr << "new" << endl;
-        //         } 
-        //         Wait* wait = dynamic_cast<Wait*>(task);
-        //         if (wait != nullptr) {
-        //             cerr << "wait" << endl;
-        //         }
-        //     }
-        // }
-        return 0;
+                Move* move = dynamic_cast<Move*>(task);
+                if (move != nullptr) {
+                    int service = service_name_to_id[move->service];
+                    int cur_binary = service_to_binary[service];
+
+                    int t = max(services_in_binary[cur_binary].size(), services_in_binary[move->new_binary].size());
+
+                    services_in_binary[cur_binary].erase(service);
+                    services_in_binary[move->new_binary].insert(service);
+                    service_to_binary[service] = move->new_binary;
+
+                    // cerr << "move t = " << t << endl;
+                    if (day + t < days_limit) {
+                        events[day + t].pb(eng);
+                    }
+
+                    // cerr << "move" << endl;
+                }
+                New* nnew = dynamic_cast<New*>(task);
+                if (nnew != nullptr) {
+                    services_in_binary.resize(service_to_binary.size() + 1);
+
+                    if (day + new_binary_time < days_limit) {
+                        events[day + new_binary_time].pb(eng);
+                    }
+                    // cerr << "new" << endl;
+                } 
+                Wait* wait = dynamic_cast<Wait*>(task);
+                if (wait != nullptr) {
+                    // cerr << "wait" << endl;
+                    if (day + wait->days) {
+                        events[day + wait->days].pb(eng);
+                    }
+                }
+            }
+        }
+        return score;
     }
     
 };
